@@ -1,28 +1,15 @@
 <?php
 ///////////////  Includes
-include "./config/configurer.php";
+require_once "./config/configurer.php";
+require_once "./Exceptions.php";
+
+//////////////  Namespaces Import
+use LoggerErrors\InvalidFailureNumber;
+use LoggerErrors\UnloadData;
 
 //////////////  Constants 
 define("identGuide", "    ");
 define('separator', "  ");
-
-//////////////  Exceptions
-class InvalidFailuresNumber extends Exception
-{
-    private $errno = 'Invalid failures number received!';
-
-    public function __construct()
-    {
-        echo $this->errno;
-        die();
-    }
-}
-
-class InvalidAction extends Exception
-{
-    private $errno = 'Invalid Action found!';
-}
-
 
 /////////////   Classes
 
@@ -33,32 +20,29 @@ class LoadLogFile
     protected $gotData = false;
     private $objConfig;
 
-    private function getConfig()
-    {
+    private function getConfig(){
         $this->objConfig = new Configurations("./config/configurations.json");
     }
 
-    public function __construct($sourceFile)
-    {
+    public function __construct(string $sourceFile){
         $this->source = $sourceFile;
         $this->logs = json_decode(file_get_contents($sourceFile));
         $this->gotData = true;
         $this->getConfig();
     }
 
-    private function updateLogFile()
-    {
+    private function updateLogFile(){
         if (!$this->gotData) {
-            throw new InvalidAction();
+            throw new UnloadData();
         }
         $rawData = json_encode($this->logs);
         file_put_contents($this->source, $rawData);
     }
 
-    public function listLogs($onWeb = false)
+    public function listLogs(bool $onWeb = false)
     {
         if (!$this->gotData) {
-            throw new InvalidAction();
+            throw new UnloadData();
         }
         $rtData = "";
         if ($onWeb) {
@@ -88,11 +72,13 @@ class LoadLogFile
         return $rtData;
     }
 
-    public function addLog($action, $failures = 0, $failureCode = 0)
+    public function addLog(string $action, int $failures = 0, int $failureCode = 0, bool $autoCommit = false)
     {
-        if (!$this->gotData) {
-            throw new InvalidAction();
-        }
+        /**
+         * 
+         */
+        if (!$this->gotData) { throw new UnloadData(); }
+        if($failures < 0){ throw new InvalidFailureNumber();}
         $date = date($this->objConfig->document->DateConf);
         $hour = date($this->objConfig->document->HourConf);
         array_push($this->logs, array(
@@ -102,13 +88,13 @@ class LoadLogFile
             'Failures' => $failures,
             'ErrorCode' => $failureCode
         ));
-        $this->updateLogFile();
+        if($autoCommit){ $this->updateLogFile();}
     }
 
     public function clearLogs()
     {
         if (!$this->gotData) {
-            throw new InvalidAction();
+            throw new UnloadData();
         }
         $this->logs = [];
         $this->updateLogFile();
@@ -118,13 +104,14 @@ class LoadLogFile
     public function getLogsNumber()
     {
         if (!$this->gotData) {
-            throw new InvalidAction();
+            throw new UnloadData();
         }
         return count($this->logs);
     }
 
-    public function queryByDate($queryDate)
+    public function queryByDate(string $queryDate)
     {
+        if(!$this->gotData){ throw new UnloadData();}
         $results = [];
         for ($i = 0; $i < $this->getLogsNumber(); $i++) {
             if ($this->logs[$i]->Date == $queryDate) {
@@ -134,8 +121,9 @@ class LoadLogFile
         return $results;
     }
 
-    public function queryByError($failed = true)
+    public function queryByError(bool $failed = true)
     {
+        if(!$this->gotData){ throw new UnloadData();}
         $results = [];
         for ($i = 0; $i < $this->getLogsNumber(); $i++) {
             if ($failed) {
@@ -151,8 +139,9 @@ class LoadLogFile
         return $results;
     }
 
-    public function queryByCode($errorCode)
+    public function queryByCode(int $errorCode)
     {
+        if(!$this->gotData){ throw new UnloadData();}
         $results = [];
         for ($i = 0; $i < $this->getLogsNumber(); $i++) {
             if ($this->logs[$i]->ErrorCode == $errorCode) {
@@ -162,7 +151,7 @@ class LoadLogFile
         return $results;
     }
 
-    public function queryByTime($timeOf, $by = 0)
+    public function queryByTime(string $timeOf, int $by = 0)
     {
         /**
          * @param by : 0 => Hours
@@ -171,6 +160,7 @@ class LoadLogFile
          * @param timeOf: The time value to query
          * @return array.
          */
+        if(!$this->gotData){ throw new UnloadData();}
         $results = [];
         for ($i = 0; $i < count($this->logs); $i++) {
             $splitedHour = explode(":", $this->logs[$i]->Time);
@@ -181,11 +171,12 @@ class LoadLogFile
         return $results;
     }
 
-    public function queryByAction($action)
+    public function queryByAction( string $action)
     {
         /**
          * 
          */
+        if(!$this->gotData){ throw new UnloadData();}
         $results = [];
         for ($i = 0; $i < count($this->logs); $i++) {
             if ($this->logs[$i]->Action == $action) {
@@ -196,109 +187,6 @@ class LoadLogFile
     }
 }
 
-class LoadLogsTextFile
-{
-    private $document = [];
-    private $sourceFile = "";
-    private $gotData = false;
-    private $confData;
-
-    public function __construct($source)
-    {
-        $this->sourceFile = $source;
-        $this->document = file_get_contents($this->sourceFile);
-        $this->gotData = true;
-        $this->confData = new Configurations("./config/");
-    }
-
-    public function listLogs()
-    {
-        $array = explode("\n", $this->document);
-        echo count($array);
-    }
-
-    public static function splitsNewLineArray($data)
-    {
-        return explode("\n", $data);
-    }
-
-    public function addLog($action, $failureCode = 0, $failures = 0)
-    {
-        $date = date($this->confData->document->DateConf);
-        $hour = date($this->confData->document->HourConf);
-        $rtString = $date . separator . $hour . separator . $action . separator . $failures . separator . $failureCode . "\n";
-        $this->document .= $rtString;
-    }
-
-    private function updateLogsFile()
-    {
-        file_put_contents($this->sourceFile, $this->document);
-    }
-
-    public function clearLogs(){ file_put_contents($this->sourceFile, ""); }
-
-    public function queryByDate($dateTo)
-    {
-        $results = [];
-        for ($i = 0; $i < count($this->logs); $i++) {
-            $splitedData = explode(separator, $this->logs[$i]);
-            if ($splitedData[0] == $dateTo) {
-                array_push($results, $this->logs[$i]);
-            } else { }
-        }
-        return $results;
-    }
-
-    public function queryByTime($timeTo, $by = 0)
-    {
-        /**
-         * @param int by: 
-         */
-        $results = [];
-        for ($i = 0; $i < count($this->logs); $i++) {
-            $splitedData = explode(separator, $this->logs[$i]);
-            $splitedHour = explode(":", $splitedData[1]);
-            if ($splitedHour[$by] == $timeTo) {
-                array_push($results, $this->logs[$i]);
-            } else { }
-        }
-        return $results;
-    }
-
-    public function queryByFailures($failed = true){
-        $results = [];
-        $vlQuery = $failed? 0: 1;
-        for ($i = 0; $i < count($this->logs); $i++) {
-            $splitedData = explode(separator, $this->logs[$i]);
-            if($splitedData[3] == $vlQuery || $splitedData[3] == "$vlQuery"){
-                array_push($results, $this->logs[$i]);
-            }
-            else{}
-        }
-        return $results;
-    }
-
-    public function queryByErrorCode($errorCode = 0){
-        $results = [];
-        for ($i=0; $i < count($this->logs); $i++) { 
-            $sploteData = explode(separator, $this->logs[$i]);
-            if($sploteData[4] == $errorCode || $sploteData[4] == "$errorCode"){
-                array_push($results, $this->logs[$i]);
-            }
-            else{}
-        }
-        return $results;
-    }
-
-    public function queryByAction($action){
-        $results = [];
-        for($i = 0; $i < count($this->logs); $i++){
-            $splitedData = explode(separator, $this->logs[$i]);
-            if($splitedData[2] == $action){ array_push($results, $this->logs[$i]); }
-            else{}
-        }
-        return $results;
-    }
-}
-
+$systemLogConnection = new LoadLogFile("./logs/system.json");
+global $systemLogConnection;
 ?>

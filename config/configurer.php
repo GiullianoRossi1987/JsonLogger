@@ -1,17 +1,13 @@
 <?php
+
+require_once "../Exceptions.php";
+use ConfigErrors\InvalidDateFormat;
+use ConfigErrors\InvalidHourFormat;
+
 define("configFile", "configurations.json"); // always thinking on the / project folder
 define("dateModes", ["Y/m/d", 'm/d/Y', 'd/m/Y']);
 define('hourModes', ['H:i:s', 'i:H', 's:H:i', 'i:s:H']);
 define("dftMonthsNames", ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'Agost', 'September', 'October', 'November', 'December']);
-session_start();
-
-class InvalidDateMode extends Exception{
-    private $errno = '';
-}
-
-class InvalidHourMode extends Exception{
-    private $errno = '';
-}
 
 class Configurations{
     public $document = [];
@@ -23,14 +19,14 @@ class Configurations{
         $this ->document = json_decode($rawConfig);
     }
 
-    public function configDate($newDateMode = "Y/m/d"){
-        if(!in_array($newDateMode, dateModes)){ throw new InvalidDateMode();}
+    public function configDate(string $newDateMode = "Y/m/d"){
+        if(!in_array($newDateMode, dateModes)){ throw new InvalidDateFormat();}
         $this->document->DateConf = $newDateMode;
         $this->updateDocument();
     }
 
-    public function configHour($newHourMode = "H:i:s"){
-        if(!in_array($newHourMode, hourModes)){ throw new InvalidHourMode();}
+    public function configHour(string $newHourMode = "H:i:s"){
+        if(!in_array($newHourMode, hourModes)){ throw new InvalidHourFormat();}
         $this->document->HourConf = $newHourMode;
         $this->updateDocument();
     }
