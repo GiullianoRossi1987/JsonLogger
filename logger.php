@@ -186,7 +186,4 @@ class LoadLogFile
         return $results;
     }
 }
-
-$systemLogConnection = new LoadLogFile("./logs/system.json");
-global $systemLogConnection;
 ?>
